@@ -49,6 +49,8 @@ Now, run this example from the `/src/unprotected-server/hello` folder with:
 vapor run serve --port 8002
 ```
 
+> **NOTE:** If running from inside a docker container then you need to add `--hostname 0.0.0.0` to the end of the command.
+
 Finally, you can test that it works with:
 
 ```text

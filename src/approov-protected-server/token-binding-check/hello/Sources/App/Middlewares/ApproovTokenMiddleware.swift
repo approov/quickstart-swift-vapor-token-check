@@ -52,14 +52,9 @@ final class ApproovTokenMiddleware: Middleware {
     }
 
     private func verifyApproovTokenBinding(in request: Request, claims approov_token_claims: ApproovJWTPayload?) -> Bool {
-        // Note that the `pay` claim will, under normal circumstances, be present,
-        // but if the Approov failover system is enabled, then no claim will be
-        // present, and in this case you want to return true, otherwise you will
-        // not be able to benefit from the redundancy afforded by the failover
-        // system.
         if approov_token_claims!.token_binding == nil {
             // You may want to add some logging here
-            return true
+            return false
         }
 
         if request.headers["Authorization"].isEmpty {

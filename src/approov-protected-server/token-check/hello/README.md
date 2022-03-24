@@ -7,6 +7,7 @@ This Approov integration example is from where the code example for the [Approov
 * [Why?](#why)
 * [How it Works?](#how-it-works)
 * [Requirements](#requirements)
+* [Setup Env File](#setup-env-file)
 * [Try the Approov Integration Example](#try-the-approov-integration-example)
 
 
@@ -36,15 +37,48 @@ To run this example you will need to have Swift and Vapor toolbox installed. If 
 [TOC](#toc---table-of-contents)
 
 
+## Setup Env File
+
+From `/src/approov-protected-server/token-check/hello` execute the following:
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file and add the [dummy secret](/README.md#the-dummy-secret) to it in order to be able to test the Approov integration with the provided [Postman collection](https://github.com/approov/postman-collections/blob/master/quickstarts/hello-world/hello-world.postman_curl_requests_examples.md).
+
+[TOC](#toc---table-of-contents)
+
+
 ## Try the Approov Integration Example
 
-First, you need to set the dummy secret in the `/src/approov-protected-server/token-check/hello/.env` file as explained [here](/README.md#the-dummy-secret).
-
-Next, you can run this example from the `/src/approov-protected-server/token-check/hello` folder with:
+Now you can run this example from the `/src/approov-protected-server/token-check/hello` folder with:
 
 ```text
 vapor run serve --port 8002
 ```
+
+> **NOTE:** If running from inside a docker container then you need to add `--hostname 0.0.0.0` to the end of the command.
+
+Next, you can test that it works with:
+
+```bash
+curl -iX GET 'http://localhost:8002'
+```
+
+The response will be a `401` unauthorized request:
+
+```text
+HTTP/1.1 401 Unauthorized
+content-length: 38
+content-type: application/json; charset=utf-8
+connection: keep-alive
+date: Thu, 24 Mar 2022 20:20:38 GMT
+
+{"reason":"Unauthorized","error":true}
+```
+
+The reason you got a `401` is because the Approoov token isn't provided in the headers of the request.
 
 Finally, you can test that the Approov integration example works as expected with this [Postman collection](/README.md#testing-with-postman) or with some cURL requests [examples](/README.md#testing-with-curl).
 
