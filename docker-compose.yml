@@ -1,0 +1,37 @@
+version: "2.3"
+
+services:
+
+  unprotected-server:
+    image: approov/swift-vapor:5.2_18.2.2
+    build: ./
+    networks:
+      - default
+    command: bash -c "vapor build && vapor run serve --port 8002 --hostname 0.0.0.0"
+    ports:
+      - ${HOST_IP:-127.0.0.1}:${HTTP_PORT:-8002}:${HTTP_PORT:-8002}
+    volumes:
+      - ./src/unprotected-server/hello:/home/developer/workspace
+
+  approov-token-check:
+    image: approov/swift-vapor:5.2_18.2.2
+    build: ./
+    networks:
+      - default
+    command: bash -c "vapor build && vapor run serve --port 8002 --hostname 0.0.0.0"
+    ports:
+      - ${HOST_IP:-127.0.0.1}:${HTTP_PORT:-8002}:${HTTP_PORT:-8002}
+    volumes:
+      - ./src/approov-protected-server/token-check/hello:/home/developer/workspace
+
+  approov-token-binding-check:
+    image: approov/swift-vapor:5.2_18.2.2
+    build: ./
+    networks:
+      - default
+    command: bash -c "vapor build && vapor run serve --port 8002 --hostname 0.0.0.0"
+    ports:
+      - ${HOST_IP:-127.0.0.1}:${HTTP_PORT:-8002}:${HTTP_PORT:-8002}
+    volumes:
+      - ./src/approov-protected-server/token-binding-check/hello:/home/developer/workspace
+
