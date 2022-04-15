@@ -14,14 +14,14 @@ This quickstart is for developers familiar with Swift who are looking for a quic
 
 ## Why?
 
-To lock down your API server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product.html) for more details.
+To lock down your API server to your mobile app. Please read the brief summary in the [Approov Overview](/OVERVIEW.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
 
 [TOC](#toc---table-of-contents)
 
 
 ## How it works?
 
-For more background, see the overview in the [README](/README.md#how-it-works) at the root of this repo.
+For more background, see the [Approov Overview](/OVERVIEW.md#how-it-works) at the root of this repo.
 
 The main functionality for the Approov token check is in the file [ApproovTokenMiddleware.swift](/src/approov-protected-server/token-check/hello/Sources/App/Middlewares/ApproovTokenMiddleware.swift). Take a look at the `verifyApproovToken()` function to see the simple code for the check.
 
@@ -50,7 +50,7 @@ Approov needs to know the domain name of the API for which it will issue tokens.
 
 Add it with:
 
-```text
+```bash
 approov api -add your.api.domain.com
 ```
 
@@ -62,19 +62,23 @@ Adding the API domain also configures the [dynamic certificate pinning](https://
 
 Approov tokens are signed with a symmetric secret. To verify tokens, we need to grab the secret using the [Approov secret command](https://approov.io/docs/latest/approov-cli-tool-reference/#secret-command) and plug it into the Swift Vapor API server environment to check the signatures of the [Approov Tokens](https://www.approov.io/docs/latest/approov-usage-documentation/#approov-tokens) that it processes.
 
-Retrieve the Approov secret with:
+First, enable your Approov `admin` role with:
 
-```text
+```bash
+eval `approov role admin`
+````
+
+Now, retrieve the Approov secret with:
+
+```bash
 approov secret -get base64
 ```
-
-> **NOTE:** The `approov secret` command requires an [administration role](https://approov.io/docs/latest/approov-usage-documentation/#account-access-roles) to execute successfully.
 
 #### Set the Approov Secret
 
 Open the `.env` file and add the Approov secret to the var:
 
-```text
+```bash
 APPROOV_BASE64_SECRET=approov_base64_secret_here
 ```
 
@@ -178,19 +182,19 @@ A full working example for a simple Hello World Swift Vapor API server can be fo
 
 ## Test your Approov Integration
 
-The following examples below use cURL, but you can also use the [Postman Collection](/README.md#testing-with-postman) to make the API requests. Just remember that you need to adjust the urls and tokens defined in the collection to match your deployment. Alternatively, the [README](/README.md#the-dummy-secret) at the root of this repo also contains instructions for using the preset _dummy_ secret to test your Approov integration.
+The following examples below use cURL, but you can also use the [Postman Collection](/README.md#testing-with-postman) to make the API requests. Just remember that you need to adjust the urls and tokens defined in the collection to match your deployment. Alternatively, the [README](/TESTING.md#the-dummy-secret) at the root of this repo also contains instructions for using the preset _dummy_ secret to test your Approov integration.
 
 #### With Valid Approov Tokens
 
 Generate a valid token example from the Approov Cloud service:
 
-```text
+```bash
 approov token -genExample your.api.domain.com
 ```
 
 Then make the request with the generated token:
 
-```text
+```bash
 curl -i --request GET 'https://your.api.domain.com' \
   --header 'Approov-Token: APPROOV_TOKEN_EXAMPLE_HERE'
 ```
@@ -209,13 +213,13 @@ HTTP/1.1 200 OK
 
 Generate an invalid token example from the Approov Cloud service:
 
-```text
+```bash
 approov token -type invalid -genExample your.api.domain.com
 ```
 
 Then make the request with the generated token:
 
-```text
+```bash
 curl -i --request GET 'https://your.api.domain.com' \
   --header 'Approov-Token: APPROOV_INVALID_TOKEN_EXAMPLE_HERE'
 ```
@@ -229,3 +233,30 @@ HTTP/1.1 401 Unauthorized
 
 {}
 ```
+
+[TOC](#toc---table-of-contents)
+
+
+## Issues
+
+If you find any issue while following our instructions then just report it [here](https://github.com/approov/quickstart-swift-vapor-token-check/issues), with the steps to reproduce it, and we will sort it out and/or guide you to the correct path.
+
+[TOC](#toc---table-of-contents)
+
+
+## Useful Links
+
+If you wish to explore the Approov solution in more depth, then why not try one of the following links as a jumping off point:
+
+* [Approov Free Trial](https://approov.io/signup)(no credit card needed)
+* [Approov Get Started](https://approov.io/product/demo)
+* [Approov QuickStarts](https://approov.io/docs/latest/approov-integration-examples/)
+* [Approov Docs](https://approov.io/docs)
+* [Approov Blog](https://approov.io/blog/)
+* [Approov Resources](https://approov.io/resource/)
+* [Approov Customer Stories](https://approov.io/customer)
+* [Approov Support](https://approov.zendesk.com/hc/en-gb/requests/new)
+* [About Us](https://approov.io/company)
+* [Contact Us](https://approov.io/contact)
+
+[TOC](#toc---table-of-contents)
