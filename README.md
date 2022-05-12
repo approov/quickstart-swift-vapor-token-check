@@ -144,6 +144,10 @@ Not enough details in the bare bones quickstart? No worries, check the [detailed
 
 If you find any issue while following our instructions then just report it [here](https://github.com/approov/quickstart-swift-vapor-token-check/issues), with the steps to reproduce it, and we will sort it out and/or guide you to the correct path.
 
+### System Clock
+
+In order to correctly check for the expiration times of the Approov tokens is very important that the backend server is synchronizing automatically the system clock over the network with an authoritative time source. In Linux this is usually done with a NTP server.
+
 
 ## Useful Links
 
