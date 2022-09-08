@@ -14,7 +14,7 @@ Both the quickstarts are built from the unprotected example server defined [here
 
 ## Issues
 
-If you find any issue while following our instructions then just report it [here](https://github.com/approov/quickstart-python-token-check/issues), with the steps to reproduce it, and we will sort it out and/or guide you to the correct path.
+If you find any issue while following our instructions then just report it [here](https://github.com/approov/quickstart-swift-vapor-token-check/issues), with the steps to reproduce it, and we will sort it out and/or guide you to the correct path.
 
 
 ## Useful Links
