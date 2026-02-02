@@ -1,3 +1,13 @@
+Packages
+.build
+xcuserdata
+*.xcodeproj
+DerivedData/
+.DS_Store
+db.sqlite
+.swiftpm
+.vscode
+.idea
+.config
 .env
-core
-.vapor-template/
+Package.resolved

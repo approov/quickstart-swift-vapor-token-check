@@ -1,56 +1,14 @@
-ARG TAG=5.2-focal
+# syntax=docker/dockerfile:1
+# Builds the quickstart backend container image and configures scripts/install-prerequisites.sh and scripts/build.sh
+# as the entrypoint used both locally and when deployed via Docker.
+FROM swift:5.9-jammy
 
-FROM swift:${TAG}
+ENV APP_HOME=/workspace \
+    RUN_MODE=container
 
-ARG CONTAINER_USER="developer"
-ARG LANGUAGE_CODE="en"
-ARG COUNTRY_CODE="GB"
-ARG ENCODING="UTF-8"
+WORKDIR /app
 
-ARG LOCALE_STRING="${LANGUAGE_CODE}_${COUNTRY_CODE}"
-ARG LOCALIZATION="${LOCALE_STRING}.${ENCODING}"
+COPY . .
 
-ARG OH_MY_ZSH_THEME="bira"
-
-RUN apt update && apt -y upgrade && \
-    apt -y install \
-        locales \
-        git \
-        curl \
-        inotify-tools \
-        zsh && \
-
-        echo "${LOCALIZATION} ${ENCODING}" > /etc/locale.gen && \
-        locale-gen "${LOCALIZATION}" && \
-
-        useradd -m -u 1000 -s /usr/bin/zsh "${CONTAINER_USER}" && \
-
-        bash -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)" && \
-
-        cp -v /root/.zshrc /home/"${CONTAINER_USER}"/.zshrc && \
-        cp -rv /root/.oh-my-zsh /home/"${CONTAINER_USER}"/.oh-my-zsh && \
-        sed -i "s/\/root/\/home\/${CONTAINER_USER}/g" /home/"${CONTAINER_USER}"/.zshrc && \
-        sed -i s/ZSH_THEME=\"robbyrussell\"/ZSH_THEME=\"${OH_MY_ZSH_THEME}\"/g /home/${CONTAINER_USER}/.zshrc && \
-        mkdir /home/"${CONTAINER_USER}"/workspace && \
-        chown -R "${CONTAINER_USER}":"${CONTAINER_USER}" /home/"${CONTAINER_USER}"
-
-RUN apt -y -q install --no-install-recommends build-essential
-
-RUN git clone https://github.com/vapor/toolbox.git && \
-    cd toolbox && \
-    git checkout 18.2.2 && \
-    make install
-
-USER ${CONTAINER_USER}
-
-ENV USER ${CONTAINER_USER}
-ENV LANG "${LOCALIZATION}"
-ENV LANGUAGE "${LOCALE_STRING}:${LANGUAGE_CODE}"
-ENV PATH=/home/${CONTAINER_USER}/.local/bin:${PATH}
-ENV LC_ALL "${LOCALIZATION}"
-
-WORKDIR /home/${CONTAINER_USER}/workspace
-
-
-
-CMD ["zsh"]
+# Provide APP_START_CMD via --env-file.
+CMD ["bash", "scripts/build.sh"]
