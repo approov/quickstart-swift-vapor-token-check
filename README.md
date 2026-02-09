@@ -9,20 +9,20 @@ This project provides a server-side example of Approov token verification for a 
 
 In this example, Approov token check is implemented in `ApproovApplication.swift`. The responsibilities break down as follows:
 
-1. **JWT Approov Token validation (signature + expiry)** is split between [ApproovJWTPayload.verify + verifyApproovToken()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L98-L104).
+1. **JWT Approov Token validation (signature + expiry)** is split between [ApproovJWTPayload.verify + verifyApproovToken()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L106-L113).
 `verifyApproovToken()` verifies the HS256 signature, and `ApproovJWTPayload.verify` rejects tokens past `exp`.
 
-2. **Token binding (pay + hash)** is handled by [isTokenBindingValid()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L107-L113).
+2. **Token binding (pay + hash)** is handled by [isTokenBindingValid()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L115-L121).
 It computes `base64(sha256(binding_value))` and compares it to the `pay` claim.
 
-3. **Middleware enforcement** is done by [ApproovTokenMiddleware.respond](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L178-L257).
+3. **Middleware enforcement** is done by [ApproovTokenMiddleware.respond](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L187-L270).
 Requests without valid token/binding are rejected with 401.
 
-4. **Binding value selection (what gets hashed)** is in [bindingValue(from:requiredHeaders:)](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L130-L138). It uses the headers configured in `ProtectedRoutes` (currently `Authorization` for single binding, or `Authorization` + `SessionId` for double binding).
+4. **Binding value selection (what gets hashed)** is in [bindingValue(from:requiredHeaders:)](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L138-L147). It uses the headers configured in `ProtectedRoutes` (currently `Authorization` for single binding, or `Authorization` + `SessionId` for double binding).
 
-5. **Protected route requirements** are defined in [ProtectedRoutes](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L341-L353).
+5. **Protected route requirements** are defined in [ProtectedRoutes](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L353-L366).
 
-6. **Protected routes are registered** in [registerApproovRoutes()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L33-L86).
+6. **Protected routes are registered** in [registerApproovRoutes()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L34-L95).
 
 ## Approov Token Verification Flow
 
