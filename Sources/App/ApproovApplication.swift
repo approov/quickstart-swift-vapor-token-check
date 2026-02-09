@@ -1,6 +1,7 @@
 import Crypto
 import Foundation
 import JWTKit
+import Logging
 import NIOConcurrencyHelpers
 import Vapor
 
@@ -20,7 +21,7 @@ public func configure(_ app: Application) throws {
 
 extension ApproovApplication {
     func configureApproov() throws {
-        let secret = try ApproovSecretLoader.load()
+        let secret = try ApproovSecretLoader.load(logger: logger)
         let state = ApproovState()
         let signers = JWTSigners()
         signers.use(.hs256(key: secret))
@@ -76,11 +77,11 @@ extension ApproovApplication {
 
         get("token-double-binding") { req in
             let authPresent = req.headers.first(name: ApproovHeaders.authorization)?.trimmed.isEmpty == false
-            let digestPresent = req.headers.first(name: ApproovHeaders.contentDigest)?.trimmed.isEmpty == false
+            let sessionIdPresent = req.headers.first(name: ApproovHeaders.sessionId)?.trimmed.isEmpty == false
             return req.application.infoPayload(
                 details: "Protected endpoint '/token-double-binding'; dual token binding enforced.",
                 authorizationHeaderPresent: authPresent,
-                contentDigestHeaderPresent: digestPresent
+                sessionIdHeaderPresent: sessionIdPresent
             )
         }
     }
@@ -109,10 +110,21 @@ extension ApproovApplication {
         }
         let digest = SHA256.hash(data: Data(bindingValue.utf8))
         let computed = Data(digest).base64EncodedString()
-        if computed == expected {
-            return true
+        return timingSafeEquals(computed, expected)
+    }
+
+    private func timingSafeEquals(_ lhs: String, _ rhs: String) -> Bool {
+        let lhsBytes = Array(lhs.utf8)
+        let rhsBytes = Array(rhs.utf8)
+        guard lhsBytes.count == rhsBytes.count else {
+            return false
         }
-        return Base64URL.encode(Data(digest)) == expected
+
+        var difference: UInt8 = 0
+        for index in lhsBytes.indices {
+            difference |= lhsBytes[index] ^ rhsBytes[index]
+        }
+        return difference == 0
     }
 
     func bindingValue(from request: Request, requiredHeaders: [HTTPHeaders.Name]) -> String? {
@@ -137,7 +149,7 @@ extension ApproovApplication {
     func infoPayload(
         details: String,
         authorizationHeaderPresent: Bool? = nil,
-        contentDigestHeaderPresent: Bool? = nil
+        sessionIdHeaderPresent: Bool? = nil
     ) -> ApproovInfoPayload {
         let snapshot = approovState.snapshot()
         return ApproovInfoPayload(
@@ -145,7 +157,7 @@ extension ApproovApplication {
             tokenBindingEnabled: snapshot.tokenBindingEnabled,
             details: details,
             authorizationHeaderPresent: authorizationHeaderPresent,
-            contentDigestHeaderPresent: contentDigestHeaderPresent
+            sessionIdHeaderPresent: sessionIdHeaderPresent
         )
     }
 
@@ -170,34 +182,152 @@ struct ApproovTokenMiddleware: Middleware {
         }
 
         let app = request.application
-        if !app.approovState.isApproovEnabled {
-            return next.respond(to: request)
+        let snapshot = app.approovState.snapshot()
+        let requiredHeaders = requiredHeaders(for: requirement, state: snapshot)
+
+        if !snapshot.approovEnabled {
+            return next.respond(to: request).map { response in
+                self.logCompletion(
+                    request: request,
+                    response: response,
+                    summary: "approov_disabled",
+                    requiredHeaders: requiredHeaders,
+                    state: snapshot,
+                    error: nil
+                )
+                return response
+            }
         }
 
         guard let rawToken = request.headers.first(name: ApproovHeaders.approovToken)?.trimmed,
               !rawToken.isEmpty else {
-            return unauthorizedResponse(on: request)
+            return unauthorizedResponse(
+                on: request,
+                summary: "approov_failed:missing_approov_token",
+                requiredHeaders: requiredHeaders,
+                state: snapshot,
+                error: nil
+            )
         }
 
         do {
             let payload = try app.verifyApproovToken(rawToken)
 
-            if !requirement.bindingHeaders.isEmpty, app.approovState.isTokenBindingEnabled {
-                guard let bindingValue = app.bindingValue(from: request, requiredHeaders: requirement.bindingHeaders),
-                      app.isTokenBindingValid(bindingValue, payload: payload) else {
-                    return unauthorizedResponse(on: request)
+            if snapshot.tokenBindingEnabled, !requirement.bindingHeaders.isEmpty {
+                guard let bindingValue = app.bindingValue(from: request, requiredHeaders: requirement.bindingHeaders) else {
+                    return unauthorizedResponse(
+                        on: request,
+                        summary: "approov_failed:missing_binding_header",
+                        requiredHeaders: requiredHeaders,
+                        state: snapshot,
+                        error: nil
+                    )
+                }
+                guard app.isTokenBindingValid(bindingValue, payload: payload) else {
+                    return unauthorizedResponse(
+                        on: request,
+                        summary: "approov_failed:binding_mismatch",
+                        requiredHeaders: requiredHeaders,
+                        state: snapshot,
+                        error: nil
+                    )
                 }
             }
 
-            return next.respond(to: request)
+            return next.respond(to: request).map { response in
+                let summary = response.status == .unauthorized ? "downstream_unauthorized" : "approov_ok"
+                self.logCompletion(
+                    request: request,
+                    response: response,
+                    summary: summary,
+                    requiredHeaders: requiredHeaders,
+                    state: snapshot,
+                    error: nil
+                )
+                return response
+            }
         } catch {
-            app.logger.debug("Approov token verification failed: \(error)")
-            return unauthorizedResponse(on: request)
+            return unauthorizedResponse(
+                on: request,
+                summary: "approov_failed:token_verification_failed",
+                requiredHeaders: requiredHeaders,
+                state: snapshot,
+                error: error
+            )
         }
     }
 
-    private func unauthorizedResponse(on request: Request) -> EventLoopFuture<Response> {
-        request.eventLoop.makeSucceededFuture(Response(status: .unauthorized))
+    private func requiredHeaders(
+        for requirement: ProtectedRouteRequirement,
+        state: ApproovStateSnapshot
+    ) -> [HTTPHeaders.Name] {
+        guard state.approovEnabled else {
+            return []
+        }
+        var headers: [HTTPHeaders.Name] = [ApproovHeaders.approovToken]
+        if state.tokenBindingEnabled {
+            headers.append(contentsOf: requirement.bindingHeaders)
+        }
+        return headers
+    }
+
+    private func unauthorizedResponse(
+        on request: Request,
+        summary: String,
+        requiredHeaders: [HTTPHeaders.Name],
+        state: ApproovStateSnapshot,
+        error: Error?
+    ) -> EventLoopFuture<Response> {
+        let response = Response(status: .unauthorized)
+        logCompletion(
+            request: request,
+            response: response,
+            summary: summary,
+            requiredHeaders: requiredHeaders,
+            state: state,
+            error: error
+        )
+        return request.eventLoop.makeSucceededFuture(response)
+    }
+
+    private func logCompletion(
+        request: Request,
+        response: Response,
+        summary: String,
+        requiredHeaders: [HTTPHeaders.Name],
+        state: ApproovStateSnapshot,
+        error: Error?
+    ) {
+        guard response.status == .ok || response.status == .unauthorized else {
+            return
+        }
+
+        let ipAddress = request.remoteAddress?.ipAddress ?? "unknown"
+        let port = request.application.http.server.configuration.port
+        var metadata: Logger.Metadata = [
+            "summary": .string(summary),
+            "method": .string(request.method.rawValue),
+            "path": .string(request.url.path),
+            "status": .string("\(response.status.code)"),
+            "ip": .string(ipAddress),
+            "port": .string("\(port)"),
+            "approovEnabled": .string("\(state.approovEnabled)"),
+            "tokenBindingEnabled": .string("\(state.tokenBindingEnabled)")
+        ]
+
+        if !requiredHeaders.isEmpty {
+            let headerValues = requiredHeaders.map { Logger.MetadataValue.string($0.description) }
+            metadata["required_headers"] = .array(headerValues)
+        }
+        if let error {
+            metadata["error"] = .string(String(describing: error))
+        }
+
+        if response.status == .unauthorized {
+            request.logger.warning("http.request.completed", metadata: metadata)
+        } else {
+            request.logger.notice("http.request.completed", metadata: metadata)
+        }
     }
 }
 
@@ -214,7 +344,7 @@ enum ProtectedRoutes {
         ProtectedRouteRequirement(path: "/token-binding", bindingHeaders: [ApproovHeaders.authorization]),
         ProtectedRouteRequirement(
             path: "/token-double-binding",
-            bindingHeaders: [ApproovHeaders.authorization, ApproovHeaders.contentDigest]
+            bindingHeaders: [ApproovHeaders.authorization, ApproovHeaders.sessionId]
         )
     ]
 
@@ -290,7 +420,7 @@ struct ApproovInfoPayload: Content {
     let tokenBindingEnabled: Bool
     let details: String
     let authorizationHeaderPresent: Bool?
-    let contentDigestHeaderPresent: Bool?
+    let sessionIdHeaderPresent: Bool?
 }
 
 // Approov Storage
@@ -335,13 +465,16 @@ enum Base64URL {
 // Secret Loading
 
 enum ApproovSecretLoader {
-    static func load() throws -> Data {
+    static func load(logger: Logger) throws -> Data {
         guard let rawSecret = Environment.get("APPROOV_BASE64URL_SECRET")?.trimmed,
-              !rawSecret.isEmpty else {
-            throw Abort(.internalServerError, reason: "Missing value for APPROOV_BASE64URL_SECRET")
+              !rawSecret.isEmpty,
+              rawSecret != "approov_base64url_secret_here" else {
+            logger.error("Required secret is not set")
+            throw Abort(.internalServerError, reason: "Required secret is not set")
         }
         guard let decoded = Base64URL.decode(rawSecret) else {
-            throw Abort(.internalServerError, reason: "APPROOV_BASE64URL_SECRET is not valid base64url")
+            logger.error("Required secret is invalid")
+            throw Abort(.internalServerError, reason: "Required secret is invalid")
         }
         return decoded
     }
@@ -350,7 +483,7 @@ enum ApproovSecretLoader {
 enum ApproovHeaders {
     static let approovToken = HTTPHeaders.Name("Approov-Token")
     static let authorization = HTTPHeaders.Name.authorization
-    static let contentDigest = HTTPHeaders.Name("Content-Digest")
+    static let sessionId = HTTPHeaders.Name("SessionId")
 }
 
 // String Helpers

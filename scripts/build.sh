@@ -19,7 +19,7 @@ APP_START_CMD="${APP_START_CMD:-}"                 # command executed when insid
 FOLLOW_LOGS="${FOLLOW_LOGS:-true}"                 # toggle docker logs -f attachment
 HOST_PORT="${HOST_PORT:-8080}"                     # host-facing port (e.g., http://localhost:3000)
 WAIT_URL="${WAIT_URL:-http://localhost:${HOST_PORT}/approov-state}" # readiness probe target
-WAIT_TIMEOUT="${WAIT_TIMEOUT:-60}"                   # how long to wait before failing readiness
+WAIT_TIMEOUT="${WAIT_TIMEOUT:-120}"                   # how long to wait before failing readiness
 WAIT_INTERVAL="${WAIT_INTERVAL:-2}"                   # delay between readiness checks
 CONTAINER_PORT="${CONTAINER_PORT:-$HOST_PORT}"       # container listener, defaults to host port
 IMAGE_NAME="${IMAGE_NAME:-approov-quickstart-swift-vapor}"
@@ -68,6 +68,13 @@ docker run -d \
   -p "${HOST_PORT}:${CONTAINER_PORT}" \
   "$IMAGE_NAME" >/dev/null || fail "Failed to start container ${CONTAINER_NAME}"
 
+LOGS_PID=""
+if [[ "$FOLLOW_LOGS" == "true" ]]; then
+  info "Attaching container logs immediately (Ctrl+C to stop):"
+  docker logs -f "$CONTAINER_NAME" &
+  LOGS_PID=$!
+fi
+
 wait_for_service() {
   local url="$1" timeout="$2" interval="$3" elapsed=0
   info "Waiting for application to become ready at ${url}"
@@ -84,8 +91,7 @@ wait_for_service() {
 wait_for_service "$WAIT_URL" "$WAIT_TIMEOUT" "$WAIT_INTERVAL"
 
 if [[ "$FOLLOW_LOGS" == "true" ]]; then
-  info "Container logs (Ctrl+C to stop):"
-  docker logs -f "$CONTAINER_NAME"
+  wait "$LOGS_PID"
 else
   info "Skipping container logs attachment."
 fi

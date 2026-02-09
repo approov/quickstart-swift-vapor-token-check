@@ -7,22 +7,22 @@ This project provides a server-side example of Approov token verification for a 
  - `/token-binding` - requires a valid Approov token which is bound to a header value.
  - `/token-double-binding` - requires a valid Approov token which is bound to two header values.
 
-In this example, Approov token check is implemented in `ApproovApplication.extension` (see `Sources/App/ApproovApplication.extension.swift`). The responsibilities break down as follows:
+In this example, Approov token check is implemented in `ApproovApplication.swift`. The responsibilities break down as follows:
 
-1. **JWT Approov Token validation (signature + expiry)** is implemented in [ApproovJWTPayload.verify + verifyApproovToken()](Sources/App/ApproovApplication.extension.swift#L88-L104) - lines 88 to 104.
-It verifies the HS256 signature and rejects tokens that are missing or past `exp`.
+1. **JWT Approov Token validation (signature + expiry)** is split between [ApproovJWTPayload.verify + verifyApproovToken()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L98-L104).
+`verifyApproovToken()` verifies the HS256 signature, and `ApproovJWTPayload.verify` rejects tokens past `exp`.
 
-2. **Token binding (pay + hash)** is handled by [isTokenBindingValid()](Sources/App/ApproovApplication.extension.swift#L106-L112) - lines 106 to 112.
-It computes `base64(sha256(binding_value))` and compares it to `pay` with a "name".
+2. **Token binding (pay + hash)** is handled by [isTokenBindingValid()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L107-L113).
+It computes `base64(sha256(binding_value))` and compares it to the `pay` claim.
 
-3. **Middleware enforcement** is done by [ApproovTokenMiddleware.respond](Sources/App/ApproovApplication.extension.swift#L162-L194) - lines 162 to 194.
+3. **Middleware enforcement** is done by [ApproovTokenMiddleware.respond](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L178-L257).
 Requests without valid token/binding are rejected with 401.
 
-4. **Binding value selection (what gets hashed)** is in [bindingValue(from:requiredHeaders:)](Sources/App/ApproovApplication.extension.swift#L115-L123) - lines 115 to 123. It uses the headers configured in `ProtectedRoutes` (currently `Authorization` for single binding, or `Authorization` + `Content-Digest` for double binding).
+4. **Binding value selection (what gets hashed)** is in [bindingValue(from:requiredHeaders:)](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L130-L138). It uses the headers configured in `ProtectedRoutes` (currently `Authorization` for single binding, or `Authorization` + `SessionId` for double binding).
 
-5. **Protected route requirements** are defined in [ProtectedRoutes](Sources/App/ApproovApplication.extension.swift#L197-L215) - lines 197 to 215.
+5. **Protected route requirements** are defined in [ProtectedRoutes](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L341-L353).
 
-6. **Protected routes are registered** in [registerApproovRoutes()](Sources/App/ApproovApplication.extension.swift#L32-L86) - lines 32 to 86.
+6. **Protected routes are registered** in [registerApproovRoutes()](https://github.com/approov/quickstart-swift-vapor-token-check/blob/refactor/swift-vapor-quickstart/Sources/App/ApproovApplication.swift#L33-L86).
 
 ## Approov Token Verification Flow
 
@@ -93,7 +93,7 @@ bash test.sh
 This script:
 - Verifies that the `approov` and `curl` commands are installed.
 - Checks Approov status by calling `/approov-state` (enabled vs disabled).
-- Runs endpoint tests against `/unprotected` (no token), `/token-check` (valid/invalid Approov tokens), `/token-binding` (token bound to `Authorization`), and `/token-double-binding` (token bound to `Authorization` + `Content-Digest`).
+- Runs endpoint tests against `/unprotected` (no token), `/token-check` (valid/invalid Approov tokens), `/token-binding` (token bound to `Authorization`), and `/token-double-binding` (token bound to `Authorization` + `SessionId`).
 - Logs full request/response details to `.config/logs/<timestamp>.log`.
 
 #### *1. Unprotected Endpoint (No Approov)*
@@ -190,16 +190,16 @@ Cache-Control: no-cache
 - The client sends three headers on authenticated API calls:
     - `Approov-Token`
     - `Authorization`
-    - `Content-Digest` It is combined with the `Authorization` header to create a stronger binding.
+    - `SessionId` It is combined with the `Authorization` header to create a stronger binding.
 - Both are included in the hash inside the Approov token. This means the server verifies a single hash that covers both authentication credentials.
 - **Use case:** Stronger protection then single binding by tying both headers together.
 
 ***The following example shows how the API responds when an Approov token with two bindings is required.***
 
-*Generate a valid Approov token bound to the `Authorization` and `Content-Digest` headers:*
+*Generate a valid Approov token bound to the `Authorization` and `SessionId` headers:*
 
 ```bash
-approov token -setDataHashInToken ExampleAuthToken==ContentDigest== -genExample example.com
+approov token -setDataHashInToken ExampleAuthToken==123 -genExample example.com
 ```
 
 *Use the generated token with two bindings in the Approov-Token and Authorization headers when calling the `/token-double-binding` endpoint.*
@@ -208,7 +208,7 @@ approov token -setDataHashInToken ExampleAuthToken==ContentDigest== -genExample 
 curl -iX GET http://localhost:8080/token-double-binding \
      -H "Approov-Token: valid_approov_token_here" \
      -H "Authorization: ExampleAuthToken==" \
-     -H "Content-Digest: ContentDigest=="
+     -H "SessionId: 123"
 ```
 
 The response will be `200 OK` for this request.
@@ -239,12 +239,12 @@ curl -X GET http://localhost:8080/approov-state       # check current state
 
 **Environments where the quickstart was tested:**
 ```text
-* Runtime: Swift 5.9+
-* Framework: Vapor 4
-* Build Tool: Swift Package Manager
+* Runtime: Swift 6.2.3
+* Framework: Vapor 4.121.1
+* Build Tool: Swift Package Manager 6.2.3
 ```
 
-If you encounter any problems while following this guide, or have any other concerns, please let us know by opening an issue [here](https://github.com/approov/quickstart-java-spring-token-check/issues) and we will be happy to assist you.
+If you encounter any problems while following this guide, or have any other concerns, please let us know by opening an issue [here](https://github.com/approov/quickstart-swift-vapor-token-check/issues) and we will be happy to assist you.
 
 ## Useful Links
 
