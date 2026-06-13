@@ -132,8 +132,8 @@
         "repositoryURL": "https://github.com/apple/swift-nio.git",
         "state": {
           "branch": null,
-          "revision": "635b2589494c97e48c62514bc8b37ced762e0a62",
-          "version": "2.63.0"
+          "revision": "77b84ac2cd2ac9e4ac67d19f045fd5b434f56967",
+          "version": "2.101.0"
         }
       },
       {
@@ -186,8 +186,8 @@
         "repositoryURL": "https://github.com/apple/swift-system.git",
         "state": {
           "branch": null,
-          "revision": "025bcb1165deab2e20d4eaba79967ce73013f496",
-          "version": "1.2.1"
+          "revision": "e402d5fa38d1524896e7d913ce1320384e0bedf7",
+          "version": "1.7.0"
         }
       },
       {
